@@ -1,5 +1,4 @@
 # SciTopic
-# scBenckmark
 [![arXiv](https://img.shields.io/badge/arXiv-2508.20514-b31b1b.svg?style=plastic)](https://arxiv.org/pdf/2508.20514.pdf)
 
 ```bibtex
