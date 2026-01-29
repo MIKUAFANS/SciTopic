@@ -2,7 +2,7 @@
 
 [![arXiv](https://img.shields.io/badge/arXiv-2508.20514-b31b1b.svg?style=plastic)](https://arxiv.org/pdf/2508.20514.pdf)
 [![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://www.python.org/)
-[![License](https://img.shields.io/badge/License-GPL%3.0-green.svg)](LICENSE)
+[![License](https://img.shields.io/badge/License-GPL%203.0-green.svg)](LICENSE)
 
 > **Enhancing Topic Discovery in Scientific Literature through Advanced LLM**
 
