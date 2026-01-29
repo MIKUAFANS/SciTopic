@@ -2,7 +2,7 @@
 
 [![arXiv](https://img.shields.io/badge/arXiv-2508.20514-b31b1b.svg?style=plastic)](https://arxiv.org/pdf/2508.20514.pdf)
 [![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://www.python.org/)
-[![License](https://img.shields.io/badge/License-Apache%202.0-green.svg)](LICENSE)
+[![License](https://img.shields.io/badge/License-GPL%3.0-green.svg)](LICENSE)
 
 > **Enhancing Topic Discovery in Scientific Literature through Advanced LLM**
 
@@ -185,7 +185,7 @@ If you find this work useful, please cite our paper:
 
 ## License
 
-This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the GPL-3.0 License - see the [LICENSE](LICENSE) file for details.
 
 ## Acknowledgments
 
