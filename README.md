@@ -6,126 +6,151 @@
 
 > **Enhancing Topic Discovery in Scientific Literature through Advanced LLM**
 
-SciTopic is a novel framework that leverages Large Language Models (LLMs) to enhance topic discovery in scientific literature. By combining text embeddings, entropy-based sampling, and LLM-guided fine-tuning, SciTopic achieves superior topic coherence and diversity compared to traditional topic modeling methods.
+SciTopic is a framework that leverages Large Language Models (LLMs) to enhance
+topic discovery in scientific literature. It combines text embeddings,
+entropy-based sampling, and LLM-guided fine-tuning to achieve higher topic
+coherence and diversity than traditional topic-modeling methods.
 
 ---
 
 ## Overview
 
-Traditional topic models often struggle with the complexity and nuanced vocabulary of scientific texts. SciTopic addresses this by:
+Traditional topic models often struggle with the complex, nuanced vocabulary of
+scientific texts. SciTopic addresses this with a three-stage pipeline:
 
-- **Semantic Embedding**: Using BGE-M3 for high-quality text representations
-- **Intelligent Clustering**: K-means clustering on embedded representations
-- **Entropy-based Sampling**: Selecting representative samples for LLM queries
-- **LLM Enhancement**: Leveraging LLMs to generate topic-aware training data
-- **Fine-tuning**: Refining embeddings with knowledge distillation
-
-## Features
-
-- Multi-modal text embedding with BGE-M3
-- Entropy-based representative sample selection
-- LLM-guided topic label generation
-- Knowledge distillation for embedding fine-tuning
-- Comprehensive evaluation metrics (Topic Coherence, Topic Diversity, DBI, Silhouette Score, CHI)
-- Word cloud visualization for topic interpretation
+1. **Semantic embedding** — encode each paper's title, abstract, and metadata
+   with BGE-M3.
+2. **Clustering** — group papers with K-means (or HDBSCAN) over the embeddings.
+3. **Entropy-based sampling** — select the papers whose cluster assignment is
+   most ambiguous and turn them into pairwise comparison queries.
+4. **LLM enhancement** — ask an LLM which candidate is topically closest, then
+   turn its judgements into fine-tuning triplets.
+5. **Fine-tuning & evaluation** — refine the embedding model with knowledge
+   distillation and score the resulting topics.
 
 ## Project Structure
 
 ```
 SciTopic/
-├── 1-train.py           # Training pipeline: embedding, clustering, LLM query
-├── 2-finetune.sh        # Fine-tuning script using FlagEmbedding
-├── 3-evalution.py       # Evaluation and visualization
-├── dataset/
-│   └── paper_info.csv   # Input dataset (title, authors, conference, year, abstract)
-├── models/
-│   ├── scitopic/        # Core modules
-│   │   ├── _embedding.py    # Text embedding module
-│   │   ├── _cluster.py      # Clustering module
-│   │   └── _llm_query.py    # LLM query and fine-tune data generation
-│   └── evalution/       # Evaluation metrics
-└── output/              # Generated outputs (embeddings, fine-tune data, results)
+├── pyproject.toml              # Packaging, dependencies, console script
+├── configs/
+│   └── default.yaml            # All tunable parameters
+├── .env.example                # Template for LLM credentials (secrets)
+├── scripts/
+│   └── finetune.sh             # FlagEmbedding fine-tuning wrapper (stage 2)
+├── src/scitopic/
+│   ├── cli.py                  # `scitopic train|evaluate`
+│   ├── config.py               # Layered YAML + .env configuration
+│   ├── embedding.py            # BGE-M3 / SentenceTransformer embedding
+│   ├── clustering.py           # K-means / HDBSCAN
+│   ├── sampling.py             # Entropy-based triplet sampling
+│   ├── llm.py                  # Online (HTTP) and local (vLLM) LLM backends
+│   ├── finetune.py             # Build FlagEmbedding fine-tune data
+│   ├── pipeline.py             # Stage orchestration (train / evaluate)
+│   ├── visualization.py        # Per-topic word clouds
+│   └── evaluation/             # Topic-quality metrics (TC, TD, DBI, ...)
+├── examples/
+│   └── run_pipeline.py         # Programmatic usage
+├── tests/                      # Unit tests for the pure-logic modules
+└── dataset/
+    └── paper_info.csv          # Input data (title, authors, conference, year, abstract)
 ```
 
 ## Installation
 
-### Prerequisites
-
-- Python 3.8+
-- PyTorch
-- CUDA (recommended for GPU acceleration)
-
-### Dependencies
+Requires Python 3.8+. A CUDA-capable GPU is recommended for embedding and
+fine-tuning.
 
 ```bash
-pip install numpy pandas torch transformers FlagEmbedding wordcloud matplotlib scikit-learn openai
+# Core install (embedding, clustering, sampling, LLM query, fine-tune data)
+pip install -e .
+
+# Add the evaluation/visualization stack (topmost, bertopic, spacy, ...)
+pip install -e ".[evaluation]"
+
+# Development tools (pytest, ruff, black)
+pip install -e ".[dev]"
 ```
 
-### Pre-trained Model
+### Pre-trained model
 
-Download the BGE-M3 model and place it in the `pretrained_model/` directory:
+Download BGE-M3 and point `embedding.model_path` (in `configs/default.yaml`) at
+it — the default is `pretrained_model/bge-m3`.
+
+## Configuration
+
+All parameters live in [`configs/default.yaml`](configs/default.yaml). Override
+them with your own YAML:
 
 ```bash
-mkdir -p pretrained_model
-# Download BGE-M3 from HuggingFace
+scitopic train --config my_config.yaml
 ```
+
+**Secrets are never stored in YAML.** Copy `.env.example` to `.env` and fill in
+your LLM endpoint:
+
+```bash
+cp .env.example .env
+# .env
+SCITOPIC_LLM_API_KEY=your-api-key
+SCITOPIC_LLM_BASE_URL=https://your-endpoint/v1
+```
+
+`.env` is gitignored so credentials stay out of version control.
 
 ## Usage
 
-SciTopic follows a three-stage pipeline:
-
-### Stage 1: Training Data Generation
-
-Generate embeddings, perform clustering, and query LLM for topic-aware fine-tuning data:
+### Stage 1 — Training-data generation
 
 ```bash
-python 1-train.py
+scitopic train
 ```
 
-This script will:
-1. Load paper data from `dataset/paper_info.csv`
-2. Generate text embeddings using BGE-M3
-3. Perform K-means clustering (default: 100 clusters)
-4. Apply entropy-based sampling to select representative papers
-5. Query LLM to generate topic labels
-6. Create fine-tuning dataset
+Loads the dataset, embeds papers, clusters them, applies entropy-based sampling,
+queries the LLM, and writes FlagEmbedding fine-tuning data. The command prints
+the suggested `--query_max_len` / `--passage_max_len` for the next stage.
 
-### Stage 2: Fine-tuning
-
-Fine-tune the embedding model with the generated data:
+### Stage 2 — Fine-tuning
 
 ```bash
-bash 2-finetune.sh
+bash scripts/finetune.sh
 ```
 
-Key parameters:
-- `--model_name_or_path`: Path to pre-trained BGE-M3
-- `--train_data`: Path to generated fine-tune data
-- `--num_train_epochs`: Number of training epochs (default: 3)
-- `--learning_rate`: Learning rate (default: 1e-5)
+A thin wrapper over `FlagEmbedding.finetune.embedder.encoder_only.m3`. Edit the
+paths and GPU selection at the top of the script to match your environment.
 
-### Stage 3: Evaluation
-
-Evaluate the fine-tuned model and generate visualizations:
+### Stage 3 — Evaluation
 
 ```bash
-python 3-evalution.py
+scitopic evaluate
 ```
 
-Evaluation metrics include:
-- **Topic Coherence (TC)**: Measures semantic similarity within topics
-- **Topic Diversity (TD)**: Measures uniqueness across topics
-- **Davies-Bouldin Index (DBI)**: Measures cluster separation
-- **Silhouette Score**: Measures cluster cohesion and separation
-- **Calinski-Harabasz Index (CHI)**: Measures cluster density
+Re-embeds with the fine-tuned model, computes topic-quality metrics, and renders
+per-topic word clouds under `result/`.
 
-Results will be saved to `result/` including:
-- Topic word scores (`result/topic_word_score/`)
-- Word cloud visualizations (`result/wordcloud/`)
+| Metric | Meaning |
+|--------|---------|
+| Topic Coherence (TC) | Semantic similarity within topics |
+| Topic Diversity (TD) | Uniqueness across topics |
+| Davies-Bouldin Index (DBI) | Cluster separation (lower is better) |
+| Silhouette Score | Cluster cohesion and separation |
+| Calinski-Harabasz Index (CHI) | Cluster density |
+
+### Programmatic use
+
+```python
+from scitopic import load_config, run_train, run_evaluate
+
+config = load_config()          # or load_config("my_config.yaml")
+run_train(config)
+run_evaluate(config)
+```
+
+See [`examples/run_pipeline.py`](examples/run_pipeline.py) for a complete script.
 
 ## Dataset Format
 
-Input CSV file should contain the following columns:
+The input CSV must contain these columns:
 
 | Column | Description |
 |--------|-------------|
@@ -135,40 +160,14 @@ Input CSV file should contain the following columns:
 | `year` | Publication year |
 | `abstract` | Paper abstract |
 
-## Configuration
+## Development
 
-### LLM API Configuration
-
-In `1-train.py`, configure your LLM API:
-
-```python
-llm_query_model = LLMQueryOnline(api_key="your-api-key", model="model_name")
+```bash
+pip install -e ".[dev]"
+pytest            # run the test suite
+ruff check .      # lint
+black .           # format
 ```
-
-### Clustering Parameters
-
-Adjust clustering parameters in `1-train.py`:
-
-```python
-cluster = TextCluster(model_name="k_means", n_clusters=100)  # Number of clusters
-```
-
-### Evaluation Parameters
-
-Adjust evaluation parameters in `3-evalution.py`:
-
-```python
-evaluation_scitopic(documents, output_embedding, num_topic=10, topic_words=10)
-```
-
-## Results
-
-SciTopic demonstrates significant improvements over baseline methods:
-
-- Higher topic coherence scores
-- Better topic diversity
-- More interpretable topic representations
-- Improved clustering quality metrics
 
 ## Citation
 
@@ -185,9 +184,11 @@ If you find this work useful, please cite our paper:
 
 ## License
 
-This project is licensed under the GPL-3.0 License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the GPL-3.0 License — see the [LICENSE](LICENSE)
+file for details.
 
 ## Acknowledgments
 
-- [FlagEmbedding](https://github.com/FlagOpen/FlagEmbedding) for the BGE-M3 model and fine-tuning framework
-- The authors of the papers in our dataset for their valuable research contributions
+- [FlagEmbedding](https://github.com/FlagOpen/FlagEmbedding) for the BGE-M3 model
+  and fine-tuning framework.
+- The authors of the papers in our dataset for their valuable research.
