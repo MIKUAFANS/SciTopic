@@ -1,0 +1,47 @@
+# SciTopic default configuration
+# Override any value via a custom YAML passed with `--config`, or via environment
+# variables loaded from a `.env` file (see `.env.example`).
+
+data:
+  # Path to the input CSV. Must contain columns:
+  # title, authors, conference, year, abstract
+  input_csv: dataset/paper_info.csv
+
+paths:
+  output_dir: output
+  embedding_dir: output/embedding
+  finetune_data_dir: output/fine_tune/AI-DM
+  finetune_embedding_dir: output/finetune
+  result_dir: result
+  cache_dir: cache
+
+embedding:
+  # "bge" uses FlagEmbedding BGEM3FlagModel; anything else uses SentenceTransformer.
+  backend: bge
+  model_path: pretrained_model/bge-m3
+  # Model used when re-embedding after fine-tuning (stage 3).
+  finetuned_model_path: finetune_result
+  device: cuda
+  use_fp16: true
+
+clustering:
+  method: k_means        # k_means | hdbscan
+  n_clusters: 100
+  random_state: 2024
+
+sampling:
+  gamma_low: 0.0
+  gamma_high: 0.2
+  alpha: 1.0
+  epsilon: 0.5
+
+llm:
+  # Credentials come from the environment (.env): SCITOPIC_LLM_API_KEY,
+  # SCITOPIC_LLM_BASE_URL. Do not hard-code secrets here.
+  model: Meta-Llama-3.1-70B-Instruct
+  n_jobs: 8
+  prompt: null           # null -> use built-in default prompt
+
+evaluation:
+  num_topic: 10
+  topic_words: 10
